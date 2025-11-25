@@ -1,6 +1,7 @@
 {
   "name": "lisp-generator-backend",
   "version": "1.0.0",
+  "type": "module",
   "description": "AutoCAD LISP Generator Backend",
   "main": "api/generate-lisp.js",
   "author": "İsa Bektaş",
