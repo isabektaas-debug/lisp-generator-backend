@@ -6,17 +6,21 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS ayarları - DÜZELTİLDİ
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-}));
+// CORS - TAM AÇIK
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 app.use(express.json());
 
-// Kullanım verilerini oku
 async function readUsageData() {
   try {
     const data = await fs.readFile(path.join(__dirname, 'data', 'usage.json'), 'utf8');
@@ -26,7 +30,6 @@ async function readUsageData() {
   }
 }
 
-// Kullanım verilerini kaydet
 async function saveUsageData(data) {
   try {
     await fs.writeFile(
@@ -38,17 +41,14 @@ async function saveUsageData(data) {
   }
 }
 
-// Admin istatistikleri
 app.get('/api/stats', async (req, res) => {
   const usageData = await readUsageData();
   res.json(usageData);
 });
 
-// Ana endpoint
 app.post('/api/generate', async (req, res) => {
   const { commandName, description, licenseKey } = req.body;
 
-  // Lisans kontrolü
   const validLicenses = ['DEMO-2024-FREE', 'ISA-BEKTAS-001', 'PREMIUM-2024-001'];
   
   if (!licenseKey || !validLicenses.includes(licenseKey)) {
@@ -60,11 +60,9 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
-    // Kullanım verilerini oku
     const usageData = await readUsageData();
     const today = new Date().toISOString().split('T')[0];
 
-    // Kullanıcı verisi
     if (!usageData[licenseKey]) {
       usageData[licenseKey] = {
         totalUsage: 0,
@@ -73,7 +71,6 @@ app.post('/api/generate', async (req, res) => {
       };
     }
 
-    // Günlük kullanım kontrolü
     const dailyCount = usageData[licenseKey].dailyUsage[today] || 0;
     
     if (dailyCount >= 10) {
@@ -82,7 +79,6 @@ app.post('/api/generate', async (req, res) => {
       });
     }
 
-    // Gemini API
     const apiKey = process.env.GEMINI_API_KEY;
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`,
@@ -104,7 +100,6 @@ app.post('/api/generate', async (req, res) => {
     const code = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const cleanCode = code.replace(/```lisp\n?/g, '').replace(/```autolisp\n?/g, '').replace(/```\n?/g, '').trim();
 
-    // Kullanım güncelle
     usageData[licenseKey].totalUsage += 1;
     usageData[licenseKey].dailyUsage[today] = dailyCount + 1;
     usageData[licenseKey].lastUsed = new Date().toISOString();
